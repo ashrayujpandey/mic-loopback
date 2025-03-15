@@ -3,71 +3,136 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🎙️ Mic Loopback to Bluetooth 🔊</title>
+  <title>🎙️ Mic Loopback to Bluetooth Speaker 🔊</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       text-align: center;
-      background: #f5f5f5;
-      color: #333;
-      margin-top: 50px;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      height: 100vh;
     }
+
+    h1 {
+      margin-bottom: 40px;
+      font-size: 2rem;
+      color: #00ffc3;
+    }
+
     button {
-      padding: 15px 30px;
-      font-size: 18px;
+      background-color: #00ffc3;
+      color: #000;
       border: none;
-      border-radius: 5px;
-      background-color: #4CAF50;
-      color: white;
+      padding: 15px 30px;
+      margin: 10px;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: bold;
       cursor: pointer;
+      transition: all 0.3s ease;
     }
+
     button:hover {
-      background-color: #45a049;
+      background-color: #00c7a0;
     }
+
     #status {
       margin-top: 20px;
-      font-size: 18px;
+      font-size: 1.2rem;
     }
   </style>
 </head>
 <body>
-  <h1>🎙️ Real-Time Mic ➡️ Bluetooth Speaker 🔊</h1>
-  <button onclick="startLoopback()">Start Loopback</button>
-  <p id="status">Make sure your phone is connected to a Bluetooth speaker!</p>
+  <h1>🎙️ Mic ➡️ Bluetooth Speaker Loopback</h1>
+
+  <button onclick="checkAndStart()">🎤 Start Loopback</button>
+  <button onclick="stopLoopback()">🛑 Stop Loopback</button>
+
+  <div id="status">Waiting for Bluetooth connection...</div>
 
   <script>
-    async function startLoopback() {
-      const statusEl = document.getElementById("status");
+    let audioContext;
+    let stream;
+    let source;
+    let gainNode;
 
+    async function checkAndStart() {
+      const statusDiv = document.getElementById("status");
+      
+      // Step 1: Get audio output devices
       try {
-        const audioOutputDevices = await navigator.mediaDevices.enumerateDevices();
-        const bluetoothConnected = audioOutputDevices.some(device => 
-          device.kind === "audiooutput" && device.label.toLowerCase().includes("bluetooth")
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+
+        // Debug: list devices
+        console.log("Audio Output Devices:", audioOutputs);
+
+        // Step 2: Look for Bluetooth in labels (naive check)
+        const bluetoothDevice = audioOutputs.find(device => 
+          device.label.toLowerCase().includes('bluetooth')
         );
 
-        if (!bluetoothConnected) {
-          statusEl.textContent = "❌ Please connect to a Bluetooth speaker first!";
-          statusEl.style.color = "red";
-          return;
+        if (bluetoothDevice) {
+          statusDiv.textContent = `✅ Bluetooth speaker found: ${bluetoothDevice.label}`;
+          startLoopback(bluetoothDevice.deviceId);
+        } else {
+          statusDiv.textContent = `❌ No Bluetooth speaker found. Please connect and try again.`;
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const source = audioContext.createMediaStreamSource(stream);
-        const gainNode = audioContext.createGain();
+      } catch (error) {
+        console.error("Error checking devices:", error);
+        statusDiv.textContent = "❌ Error accessing media devices.";
+      }
+    }
 
-        // Boost volume
-        gainNode.gain.value = 2.5;
+    async function startLoopback(deviceId) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        source = audioContext.createMediaStreamSource(stream);
+        gainNode = audioContext.createGain();
+
+        // Boost volume level here
+        gainNode.gain.value = 3.0;
+
+        // Connect mic to gain to speaker
         source.connect(gainNode).connect(audioContext.destination);
 
-        statusEl.textContent = "✅ Loopback running! Speaking through Bluetooth speaker.";
-        statusEl.style.color = "green";
+        document.getElementById("status").textContent = "🔊 Loopback running on Bluetooth speaker!";
+
+        // OPTIONAL: Direct output to the Bluetooth speaker
+        const audio = new Audio();
+        if (typeof audio.setSinkId !== "undefined") {
+          audio.setSinkId(deviceId).then(() => {
+            console.log(`Output set to Bluetooth speaker: ${deviceId}`);
+          }).catch(err => {
+            console.warn("Error setting sink ID:", err);
+          });
+        } else {
+          console.warn("setSinkId() not supported in this browser.");
+        }
 
       } catch (error) {
-        console.error("Error:", error);
-        statusEl.textContent = "❌ Error accessing microphone or audio devices.";
-        statusEl.style.color = "red";
+        console.error("Error accessing microphone:", error);
+      }
+    }
+
+    function stopLoopback() {
+      if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+        document.getElementById("status").textContent = "🛑 Loopback stopped!";
+      }
+
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
       }
     }
   </script>
