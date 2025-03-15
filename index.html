@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🎙️ Mic Loopback to Bluetooth 🔊</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f5f5f5;
+      color: #333;
+      margin-top: 50px;
+    }
+    button {
+      padding: 15px 30px;
+      font-size: 18px;
+      border: none;
+      border-radius: 5px;
+      background-color: #4CAF50;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎙️ Real-Time Mic ➡️ Bluetooth Speaker 🔊</h1>
+  <button onclick="startLoopback()">Start Loopback</button>
+  <p id="status">Make sure your phone is connected to a Bluetooth speaker!</p>
+
+  <script>
+    async function startLoopback() {
+      const statusEl = document.getElementById("status");
+
+      try {
+        const audioOutputDevices = await navigator.mediaDevices.enumerateDevices();
+        const bluetoothConnected = audioOutputDevices.some(device => 
+          device.kind === "audiooutput" && device.label.toLowerCase().includes("bluetooth")
+        );
+
+        if (!bluetoothConnected) {
+          statusEl.textContent = "❌ Please connect to a Bluetooth speaker first!";
+          statusEl.style.color = "red";
+          return;
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        const gainNode = audioContext.createGain();
+
+        // Boost volume
+        gainNode.gain.value = 2.5;
+
+        source.connect(gainNode).connect(audioContext.destination);
+
+        statusEl.textContent = "✅ Loopback running! Speaking through Bluetooth speaker.";
+        statusEl.style.color = "green";
+
+      } catch (error) {
+        console.error("Error:", error);
+        statusEl.textContent = "❌ Error accessing microphone or audio devices.";
+        statusEl.style.color = "red";
+      }
+    }
+  </script>
+</body>
+</html>
